@@ -60,10 +60,16 @@ clip sz (Mask m) = Mask $ clip' sz m
 
 -- |These return a number bits to shift for a given direction
 shiftN, shiftE, shiftS, shiftW :: Size -> Int
-shiftN (Size (w,_)) = w
-shiftE _            = 1
-shiftS (Size (w,_)) = -w
-shiftW _            = -1
+shiftN (Size (w,_))  =  w
+shiftE _             =  1
+shiftS (Size (w,_))  = -w
+shiftW _             = -1
+
+shiftNE, shiftSE, shiftNW, shiftSW :: Size -> Int
+shiftNE (Size (w,_)) =  w+1
+shiftSE (Size (w,_)) = -w+1
+shiftNW (Size (w,_)) =  w-1
+shiftSW (Size (w,_)) = -w-1
 
 erode :: (Bits a, Num a) => (Size -> Int) -> Size -> Mask a -> Mask a
 erode f sz (Mask m) = Mask (m .&. clip' sz (m `shift` f sz))
@@ -92,7 +98,8 @@ hasNInRow sz m k
     = any (/= 0) eroded
     where
         erodeMany f = iterate (erode f sz) m !! (k-1)
-        directions  = [shiftN, shiftE, shiftS, shiftW]
+        directions  = [ shiftN, shiftE, shiftS, shiftW
+                      , shiftNE, shiftSE, shiftNW, shiftSW]
         eroded      = map (unMask . erodeMany) directions
 
 showMask :: (Integral a, Show a) => Mask a -> String

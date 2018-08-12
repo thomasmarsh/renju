@@ -13,21 +13,19 @@ module Game.Gomoku
     , printBoard
     ) where
 
-import State                 ( State(..)
-                             , Winner(..)
-                             )
-import BitBoard              ( Mask(..)
-                             , Coord(..)
-                             , Size(..)
-                             , hasNInRow
-                             , isSet
-                             , set
-                             )
-import Data.Bits             ((.|.))
-import Data.List             (find, group, intersperse, transpose)
-import Data.List.Split       (chunksOf)
-import Data.Maybe            (isJust)
-import Data.Universe.Helpers (diagonals)
+import State           ( State(..)
+                       , Winner(..)
+                       )
+import BitBoard        ( Mask(..)
+                       , Coord(..)
+                       , Size(..)
+                       , hasNInRow
+                       , isSet
+                       , set
+                       )
+import Data.Bits       ((.|.))
+import Data.List       (intersperse)
+import Data.List.Split (chunksOf)
 
 -- TODO: support more opening rules:
 -- http://gomokuworld.com/gomoku/2
@@ -83,32 +81,8 @@ unplaced s
       , not $ isSet boardSize os coord ]
     where os = occupied s
 
--- |Returns true if the list has n or more consecutive True elements
-nInRow :: Int -> [Bool] -> Bool
-nInRow n xs
-    = isJust
-    $ find ((>= n) . length)        -- find first with length >= n
-           (filter head $ group xs) -- list of lists of consecutive True values
-
--- |Returns true if the list has 5 or more consecutive True elements
-fiveInRow :: [Bool] -> Bool
-fiveInRow = nInRow 5
-
--- TODO: bitboard techniques
 hasWin :: Mask Integer -> Bool
 hasWin m = hasNInRow boardSize m 5
-        -- ^^ TODO: verify hasNInRow is same result as `fiveInRow`
-        -- any fiveInRow rows
-        -- || any fiveInRow cols
-        || any fiveInRow diagR
-        || any fiveInRow diagC
-    where
-        Size (mx, my) = boardSize
-        test          = isSet boardSize m
-        rows          = [[test $ Coord (x,y) | x <- [0..mx-1]] | y <- [0..my-1]]
-        cols          = transpose rows
-        diagR         = diagonals rows
-        diagC         = diagonals cols
 
 noMoves :: Gomoku -> Bool
 noMoves = null . unplaced
