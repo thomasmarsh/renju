@@ -19,6 +19,7 @@ import State                 ( State(..)
 import BitBoard              ( Mask(..)
                              , Coord(..)
                              , Size(..)
+                             , hasNInRow
                              , isSet
                              , set
                              )
@@ -79,7 +80,8 @@ unplaced :: Gomoku -> [Action Gomoku]
 unplaced s
     = [ Place coord
       | coord <- allCoords
-      , not $ isSet boardSize (occupied s) coord ]
+      , not $ isSet boardSize os coord ]
+    where os = occupied s
 
 -- |Returns true if the list has n or more consecutive True elements
 nInRow :: Int -> [Bool] -> Bool
@@ -94,8 +96,10 @@ fiveInRow = nInRow 5
 
 -- TODO: bitboard techniques
 hasWin :: Mask Integer -> Bool
-hasWin m = any fiveInRow rows
-        || any fiveInRow cols
+hasWin m = hasNInRow boardSize m 5
+        -- ^^ TODO: verify hasNInRow is same result as `fiveInRow`
+        -- any fiveInRow rows
+        -- || any fiveInRow cols
         || any fiveInRow diagR
         || any fiveInRow diagC
     where

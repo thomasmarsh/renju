@@ -8,6 +8,7 @@ module BitBoard
     , dilateOrtho
     , erode
     , erodeOrtho
+    , hasNInRow
     , isSet
     , printMask'
     , set
@@ -33,6 +34,9 @@ newtype Size   = Size (Int, Int)  deriving (Eq, Show)
 newtype Coord  = Coord (Int, Int) deriving (Eq, Show)
 newtype Index  = Index Int        deriving (Eq, Show)
 
+unMask :: Mask a -> a
+unMask (Mask m) = m
+
 showBin :: (Integral a, Show a) => a -> String
 showBin n = showIntAtBase 2 intToDigit n ""
 
@@ -56,9 +60,9 @@ clip sz (Mask m) = Mask $ clip' sz m
 
 -- |These return a number bits to shift for a given direction
 shiftN, shiftE, shiftS, shiftW :: Size -> Int
-shiftN (Size (w,_)) = w+1
+shiftN (Size (w,_)) = w
 shiftE _            = 1
-shiftS (Size (w,_)) = -(w+1)
+shiftS (Size (w,_)) = -w
 shiftW _            = -1
 
 erode :: (Bits a, Num a) => (Size -> Int) -> Size -> Mask a -> Mask a
@@ -82,6 +86,14 @@ dilateOrtho sz (Mask m)
     .|. clip' sz (m `shift` shiftE sz)
     .|.          (m `shift` shiftS sz)
     .|.          (m `shift` shiftW sz)
+
+hasNInRow :: (Bits a, Num a) => Size -> Mask a -> Int -> Bool
+hasNInRow sz m k
+    = any (/= 0) eroded
+    where
+        erodeMany f = iterate (erode f sz) m !! (k-1)
+        directions  = [shiftN, shiftE, shiftS, shiftW]
+        eroded      = map (unMask . erodeMany) directions
 
 showMask :: (Integral a, Show a) => Mask a -> String
 showMask (Mask m) = showBin m
