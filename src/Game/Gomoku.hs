@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
+
 module Game.Gomoku
     ( Gomoku(..)
     , Action(..)
@@ -10,8 +11,7 @@ module Game.Gomoku
     , boardSize
     , showBoard
     , printBoard
-    )
-    where
+    ) where
 
 import State                 ( State(..)
                              , Winner(..)
@@ -23,7 +23,7 @@ import BitBoard              ( Mask(..)
                              , set
                              )
 import Data.Bits             ((.|.))
-import Data.List             (find, group, intersperse)
+import Data.List             (find, group, intersperse, transpose)
 import Data.List.Split       (chunksOf)
 import Data.Maybe            (isJust)
 import Data.Universe.Helpers (diagonals)
@@ -100,11 +100,11 @@ hasWin m = any fiveInRow rows
         || any fiveInRow diagC
     where
         Size (mx, my) = boardSize
-        test = isSet boardSize m
-        rows = [[test $ Coord (x,y) | x <- [0..mx-1]] | y <- [0..my-1]]
-        cols = [[test $ Coord (x,y) | y <- [0..my-1]] | x <- [0..mx-1]]
-        diagR = diagonals rows
-        diagC = diagonals cols
+        test          = isSet boardSize m
+        rows          = [[test $ Coord (x,y) | x <- [0..mx-1]] | y <- [0..my-1]]
+        cols          = transpose rows
+        diagR         = diagonals rows
+        diagC         = diagonals cols
 
 noMoves :: Gomoku -> Bool
 noMoves = null . unplaced
@@ -119,8 +119,8 @@ instance State Gomoku where
         = Place Coord
         deriving (Eq, Show)
 
-    start = Gomoku { black = Mask 0
-                   , white = Mask 0
+    start = Gomoku { black   = Mask 0
+                   , white   = Mask 0
                    , current = Black }
 
     currentTurn = current
