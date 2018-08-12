@@ -2,17 +2,28 @@ module BitBoard
     ( Mask(..)
     , Size(..)
     , Coord(..)
+    , clip
+    , clip'
+    , dilate
+    , dilateOrtho
+    , erode
+    , erodeOrtho
+    , isSet
+    , printMask'
+    , set
+    , shiftN
+    , shiftE
+    , shiftS
+    , shiftW
     , showBin
     , showBin'
     , showMask
-    , printMask'
-    , set
-    , isSet
     )
     where
 
-import Data.Bits       (Bits, setBit, testBit)
+import Data.Bits       ((.&.), (.|.), Bits, setBit, shift, testBit)
 import Data.Char       (intToDigit)
+import Data.List       (intersperse)
 import Data.List.Split (chunksOf)
 import Data.Tuple      (swap)
 import Numeric         (showIntAtBase)
@@ -26,13 +37,51 @@ showBin :: (Integral a, Show a) => a -> String
 showBin n = showIntAtBase 2 intToDigit n ""
 
 showBin' :: (Integral a, Show a) => Size -> a -> String
-showBin' sz n = unlines rows
+showBin' sz n = (unlines . map (intersperse ' ')) rows
     where binStr = showBin n
           missing = numPositions - length binStr
           pad = replicate missing '0'
           rows = chunksOf width (reverse $ pad ++ binStr)
           Size (width, height) = sz
           numPositions = width * height
+
+-- |Since Integers do not truncate overflow, `clip` can be used to
+-- mask the number within range
+clip' :: (Bits a, Num a) => Size -> a -> a
+clip' (Size (w, h)) m = m .&. (2^(w*h)-1)
+
+-- |Calls `clip'` for values wrapped in Mask type
+clip :: (Bits a, Num a) => Size -> Mask a -> Mask a
+clip sz (Mask m) = Mask $ clip' sz m
+
+-- |These return a number bits to shift for a given direction
+shiftN, shiftE, shiftS, shiftW :: Size -> Int
+shiftN (Size (w,_)) = w+1
+shiftE _            = 1
+shiftS (Size (w,_)) = -(w+1)
+shiftW _            = -1
+
+erode :: (Bits a, Num a) => (Size -> Int) -> Size -> Mask a -> Mask a
+erode f sz (Mask m) = Mask (m .&. clip' sz (m `shift` f sz))
+
+erodeOrtho :: (Bits a, Num a) => Size -> Mask a -> Mask a
+erodeOrtho sz (Mask m)
+    = Mask $ m
+    .&. clip' sz (m `shift` shiftN sz)
+    .&. clip' sz (m `shift` shiftE sz)
+    .&.          (m `shift` shiftS sz)
+    .&.          (m `shift` shiftW sz)
+
+dilate :: (Bits a, Num a) => (Size -> Int) -> Size -> Mask a -> Mask a
+dilate f sz (Mask m) = Mask (m .|. clip' sz (m `shift` f sz))
+
+dilateOrtho :: (Bits a, Num a) => Size -> Mask a -> Mask a
+dilateOrtho sz (Mask m)
+    = Mask $ m
+    .|. clip' sz (m `shift` shiftN sz)
+    .|. clip' sz (m `shift` shiftE sz)
+    .|.          (m `shift` shiftS sz)
+    .|.          (m `shift` shiftW sz)
 
 showMask :: (Integral a, Show a) => Mask a -> String
 showMask (Mask m) = showBin m
@@ -58,3 +107,5 @@ isSet :: Bits a => Size -> Mask a -> Coord -> Bool
 isSet sz (Mask m) pos
     = m `testBit` n
     where (Index n) = coordToIndex sz pos
+
+
