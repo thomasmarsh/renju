@@ -3,6 +3,7 @@ module Main where
 import Game.Gomoku
 import State (Winner(..))
 import System.Random (randomRIO)
+import TestShift (testShifts)
 
 rstep :: Gomoku -> IO Gomoku
 rstep s = do
@@ -20,6 +21,6 @@ rollout g
 
 main :: IO ()
 main = do
-    let g = start :: Gomoku
-    print g
-    print $ legalActions [g]
+    rollout (start :: Gomoku) >>= (\x
+        -> do {printBoard x;  print $ winner [x]})
+    testShifts

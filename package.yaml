@@ -21,9 +21,10 @@ description:         Please see the README on GitHub at <https://github.com/thom
 
 dependencies:
 - base >= 4.7 && < 5
-- split
 - containers
+- digits
 - random
+- split
 
 library:
   source-dirs: src
