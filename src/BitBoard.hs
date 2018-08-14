@@ -1,221 +1,144 @@
 module BitBoard
-    ( Mask(..)
+    ( BitBoard(..)
+    , Direction(..)
     , Size(..)
-    , Coord(..)
-    , clip
-    , clip'
-    , dilate
-    , dilateOrtho
-    , erode
-    , erodeOrtho
+    , wall
+    , shiftD
     , hasNInRow
-    , isSet
-    , printMask'
-    , set
-    , shiftMaskN
-    , shiftMaskE
-    , shiftMaskS
-    , shiftMaskW
-    , shiftN
-    , shiftE
-    , shiftS
-    , shiftW
-    , shiftNE
-    , shiftNW
-    , shiftSE
-    , shiftSW
-    , showBin
-    , showBin'
-    , showMask
-    , unMask
-    , wallN
-    , wallE
-    , wallS
-    , wallW
-    , wallNE
-    , wallNW
-    , wallSE
-    , wallSW
+    , toInt
     )
     where
 
-import Data.Bits       ( (.&.)
-                       , (.|.)
-                       , Bits
-                       , complement
-                       , setBit
-                       , shift
-                       , testBit)
+import Data.Bits       (Bits(..))
 import Data.Char       (intToDigit)
 import Data.List       (intersperse)
 import Data.List.Split (chunksOf)
 import Data.Tuple      (swap)
 import Numeric         (showIntAtBase)
 
-data Direction = N | E | S | W | NE | NW | SE | SW deriving (Eq, Show)
+data Direction
+    = N  | E  | S  | W
+    | NE | NW | SE | SW
+    deriving (Eq, Show)
 
-newtype Mask a = Mask a           deriving (Eq, Show)
-newtype Size   = Size (Int, Int)  deriving (Eq, Show)
-newtype Coord  = Coord (Int, Int) deriving (Eq, Show)
-newtype Index  = Index Int        deriving (Eq, Show)
+newtype Size = Size (Int, Int)  deriving (Eq, Show)
 
--- TODO: do we need a Bits instance for Mask?
--- We might include the precision as a parameter so
--- we can do the appropriate masking of overflow bits.
--- This would be equivalent to C++'s std::bitset<size_t>.
---
--- E.g.:
---
---  newtype BitSet a = BitSet (a, Int)
---
--- A simple implementation might decide that only BitSets
--- of like precisions can be operated on.
+-- |A BitBoard is a backing type (e.g., `Word8`, `Integer`, etc.)
+-- where a is in the context `(Num a, Bits a)`, and has a Size component.
+newtype BitBoard a = BitBoard (a, Size) deriving Eq
 
-unMask :: Mask a -> a
-unMask (Mask m) = m
-{-# INLINE unMask #-}
+width :: BitBoard a -> Int
+width (BitBoard (_, Size(w, _))) = w
 
-showBin :: (Integral a, Show a) => a -> String
-showBin n = showIntAtBase 2 intToDigit n ""
+size :: BitBoard a -> Size
+size (BitBoard (_, z)) = z
 
-showBin' :: (Integral a, Show a) => Size -> a -> String
-showBin' sz n = (unlines . map (intersperse ' ')) rows
-    where binStr = showBin n
-          missing = numPositions - length binStr
-          pad = replicate missing '0'
-          -- rows = chunksOf width (reverse $ pad ++ binStr)
-          rows = chunksOf width (pad ++ binStr)
-          Size (width, height) = sz
-          numPositions = width * height
+toInt :: (Integral a) => BitBoard a -> a
+toInt (BitBoard (m, _)) = m
 
--- |Since Integers do not truncate overflow, `clip` can be used to
--- mask the number within range
-clip' :: (Bits a, Num a) => Size -> a -> a
-clip' (Size (w, h)) m = m .&. (2^(w*h)-1)
+instance (Bits a, Num a) => Bits (BitBoard a) where
+    (.&.)                              = applyBin (.&.)
+    (.|.)                              = applyBin (.|.)
+    xor                                = applyBin xor
+    complement                         = applyUn complement
+    shift                              = applyS shift
+    shiftL                             = applyS shiftL
+    shiftR                             = applyS shiftR
+    rotate                             = applyS rotate
+    rotateL                            = applyS rotateL
+    rotateR                            = applyS rotateR
+    bitSize (BitBoard (_, Size (w,h))) = w * h
+    bitSizeMaybe                       = Just . bitSize
+    isSigned _                         = False
+    testBit (BitBoard (m, _))          = testBit m
+    -- TODO: this `Size (0,0)` is a major issue that needs to be fixed.
+    bit i                              = BitBoard (bit i, Size (0,0))
+    popCount (BitBoard (m, _))         = popCount m
 
-nilClip' :: Size -> a -> a
-nilClip' _ m = m
+-- The following methods naively assume that any operation they are
+-- applying to the bits could cause overflow and that the result
+-- must be masked within range. This produces excess AND steps. Any
+-- code that needs better performance should operate on the underlying
+-- raw values.
 
+applyBin
+    :: (Bits a, Num a)
+    => (a -> a -> a)
+    -> BitBoard a
+    -> BitBoard a
+    -> BitBoard a
+applyBin f b@(BitBoard (m1, z1))
+             (BitBoard (m2, z2))
+    | z1 /= z2 = error $ "size mismatch comparing " ++ show (z1, z2)
+    | otherwise = BitBoard ( maskToSize b $ f m1 m2 , z1 )
+{-# INLINE applyBin #-}
 
--- |Calls `clip'` for values wrapped in Mask type
-clip :: (Bits a, Num a) => Size -> Mask a -> Mask a
-clip sz (Mask m) = Mask $ clip' sz m
+applyUn :: (Bits a, Num a) => (a -> a) -> BitBoard a -> BitBoard a
+applyUn f b@(BitBoard (m, z)) = BitBoard (maskToSize b $ f m, z)
+{-# INLINE applyUn #-}
+
+applyS :: (Bits a, Num a) => (a -> b -> a) -> BitBoard a -> b -> BitBoard a
+applyS f b@(BitBoard (m, z)) x = BitBoard (maskToSize b $ f m x, z)
+{-# INLINE applyS #-}
+
+maskToSize :: (Bits a, Num a) => BitBoard a -> a -> a
+maskToSize b m = m .&. (2 ^ bitSize b - 1)
+{-# INLINE maskToSize #-}
+
+instance (Bits a, Integral a, Show a) => Show (BitBoard a) where
+    show b@(BitBoard (m, Size (w,_)))
+        = unlines . map (intersperse ' ') $ rows
+        where binStr  = showIntAtBase 2 intToDigit m ""
+              missing = bitSize b - length binStr
+              pad     = replicate missing '0'
+              rows    = chunksOf w (pad ++ binStr)
+
 
 -- |A row of 1s along each wall
--- |This is just wallS left shifted by number of columns
-wallN, wallE, wallS, wallW :: (Bits a, Num a) => Size -> Mask a
-wallN (Size (mx,my)) = Mask $ (2^mx-1) `shift` (mx * (my-1))
--- |Sets ever rows's low bit
-wallW (Size (mx,my)) = Mask (foldl (.|.) 0 [1 `shift` (mx*x+mx-1) | x<-[0..my-1]])
--- |Sets all low bit 1s
-wallS (Size (mx,_)) = Mask $ 2^mx-1
--- |Left shifted wallE
-wallE (Size (mx,my)) = Mask (foldl (.|.) 0 [1 `shift` (mx*x) | x<-[0..my-1]])
+wall :: (Bits a, Num a) => Direction -> Size -> BitBoard a
+wall N z@(Size (w,h)) = BitBoard ((2^w-1) `shift` (w * (h-1)), z)
+wall E z@(Size (w,h)) = BitBoard (foldl (.|.) 0
+                                        [ 1 `shift` (w*x)
+                                        | x<-[0..h-1] ], z)
+wall S z@(Size (w,_)) = BitBoard (2^w-1, z)
+wall W z@(Size (w,h)) = BitBoard (foldl (.|.) 0
+                                        [ 1 `shift` (w*x+w-1)
+                                        | x <- [0..h-1] ], z)
 
-wallNE, wallNW, wallSE, wallSW :: (Bits a, Num a) => Size -> Mask a
-wallNE sz = Mask (n .|. e)
-    where Mask n = wallN sz
-          Mask e = wallE sz
-wallNW sz = Mask (n .|. w)
-    where Mask n = wallN sz
-          Mask w = wallW sz
-wallSE sz = Mask (s .|. e)
-    where Mask s = wallS sz
-          Mask e = wallE sz
-wallSW sz = Mask (s .|. w)
-    where Mask s = wallS sz
-          Mask w = wallW sz
+wall NE z = wall N z .|. wall E z
+wall NW z = wall N z .|. wall W z
+wall SE z = wall S z .|. wall E z
+wall SW z = wall S z .|. wall W z
 
+shiftD' :: (Bits a, Num a) => BitBoard a -> Direction -> Int -> BitBoard a
+shiftD' b dir amount
+    = (b `shift` amount)
+    .&. complement (wall dir (size b) :: (Bits a, Num a) => BitBoard a)
 
--- |These return a number bits to shift for a given direction
-shiftN, shiftE, shiftS, shiftW :: Size -> Int
-shiftN (Size (w,_))  =  w
-shiftW _             =  1
-shiftS (Size (w,_))  = -w
-shiftE _             = -1
+shiftD :: (Bits a, Num a) => Direction -> BitBoard a -> BitBoard a
+shiftD N  b = shiftD' b S  (width b)
+shiftD E  b = shiftD' b W  (-1)
+shiftD S  b = shiftD' b N  (-(width b))
+shiftD W  b = shiftD' b E  1
+shiftD NE b = shiftD' b SW (width b-1)
+shiftD NW b = shiftD' b SE (width b+1)
+shiftD SE b = shiftD' b NW (-(width b)-1)
+shiftD SW b = shiftD' b NE (-(width b)-1)
 
-shiftNE, shiftNW, shiftSE, shiftSW :: Size -> Int
-shiftNW (Size (w,_)) =  w+1
-shiftNE (Size (w,_)) =  w-1
-shiftSW (Size (w,_)) = -w+1
-shiftSE (Size (w,_)) = -w-1
+erode :: (Bits a, Num a) => Direction -> BitBoard a -> BitBoard a
+erode dir b = b .&. shiftD dir b
 
-shiftMask :: (Bits a, Num a)
-          => (Size -> Int)     -- shift amount function
-          -> (Size -> Mask a)  -- wall function
-          -> (Size -> a -> a)  -- clip function
-          -> Size
-          -> Mask a
-          -> Mask a
-shiftMask shiftF wallF clipF sz (Mask m)
-    = Mask (shifted .&. complement wall)
-    where shifted   = clipF sz $ m `shift` shiftF sz
-          Mask wall = wallF sz
+dilate :: (Bits a, Num a) => Direction -> BitBoard a -> BitBoard a
+dilate dir b = b .|. shiftD dir b
 
-shiftMaskN, shiftMaskE, shiftMaskS, shiftMaskW
-    :: (Bits a, Num a)
-    => Size -> Mask a
-    -> Mask a
-shiftMaskN = shiftMask shiftN wallS clip'
-shiftMaskE = shiftMask shiftE wallW clip'
-shiftMaskS = shiftMask shiftS wallN nilClip'
-shiftMaskW = shiftMask shiftW wallE nilClip'
+-- |Iterate over a function k times
+applyN :: (a -> a) -> Int -> a -> a
+applyN f k x = iterate f x !! k
 
-
-erode :: (Bits a, Num a) => (Size -> Int) -> Size -> Mask a -> Mask a
-erode f sz (Mask m) = Mask (m .&. clip' sz (m `shift` f sz))
-
-erodeOrtho :: (Bits a, Num a) => Size -> Mask a -> Mask a
-erodeOrtho sz (Mask m)
-    = Mask $ m
-    .&. clip' sz (m `shift` shiftN sz)
-    .&. clip' sz (m `shift` shiftE sz)
-    .&.          (m `shift` shiftS sz)
-    .&.          (m `shift` shiftW sz)
-
-dilate :: (Bits a, Num a) => (Size -> Int) -> Size -> Mask a -> Mask a
-dilate f sz (Mask m) = Mask (m .|. clip' sz (m `shift` f sz))
-
-dilateOrtho :: (Bits a, Num a) => Size -> Mask a -> Mask a
-dilateOrtho sz (Mask m)
-    = Mask $ m
-    .|. clip' sz (m `shift` shiftN sz)
-    .|. clip' sz (m `shift` shiftE sz)
-    .|.          (m `shift` shiftS sz)
-    .|.          (m `shift` shiftW sz)
-
-hasNInRow :: (Bits a, Num a) => Size -> Mask a -> Int -> Bool
-hasNInRow sz m k
-    = any (/= 0) eroded
+-- |Returns True if there are k-in-a-row bits in any direction, orthogonal
+-- or diagonal.
+hasNInRow :: (Bits a, Integral a) => BitBoard a -> Int -> Bool
+hasNInRow b k = any (/= 0) eroded
     where
-        erodeMany f = iterate (erode f sz) m !! (k-1)
-        directions  = [ shiftN, shiftE, shiftS, shiftW
-                      , shiftNE, shiftSE, shiftNW, shiftSW]
-        eroded      = map (unMask . erodeMany) directions
-
-showMask :: (Integral a, Show a) => Mask a -> String
-showMask (Mask m) = showBin m
-
-printMask' :: (Integral a, Show a) => Size -> Mask a -> IO ()
-printMask' sz (Mask m)
-    = putStrLn (showBin' sz m)
-
-coordToIndex :: Size -> Coord -> Index
-coordToIndex (Size (width, _)) (Coord (x, y))
-    = Index (y * width + x)
-
-indexToCoord :: Size -> Index -> Coord
-indexToCoord (Size (width, _)) (Index i)
-    = Coord (swap $ i `divMod` width)
-
-set :: Bits a => Size -> Mask a -> Coord -> Mask a
-set sz (Mask m) pos
-    = Mask (m `setBit` n)
-    where (Index n) = coordToIndex sz pos
-
-isSet :: Bits a => Size -> Mask a -> Coord -> Bool
-isSet sz (Mask m) pos
-    = m `testBit` n
-    where (Index n) = coordToIndex sz pos
-
-
+        dirs = [N,E,S,W,NE,NW,SE,SW]
+        eroded = map (\dir -> toInt $ applyN (erode dir) (k-1) b) dirs

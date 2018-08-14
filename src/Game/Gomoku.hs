@@ -16,14 +16,11 @@ module Game.Gomoku
 import State           ( State(..)
                        , Winner(..)
                        )
-import BitBoard        ( Mask(..)
-                       , Coord(..)
+import BitBoard        ( BitBoard(..)
                        , Size(..)
                        , hasNInRow
-                       , isSet
-                       , set
                        )
-import Data.Bits       ((.|.))
+import Data.Bits       ((.|.), setBit, testBit)
 import Data.List       (intersperse)
 import Data.List.Split (chunksOf)
 
@@ -32,8 +29,8 @@ import Data.List.Split (chunksOf)
 
 data Gomoku
     = Gomoku
-    { black   :: Mask Integer
-    , white   :: Mask Integer
+    { black   :: BitBoard Integer
+    , white   :: BitBoard Integer
     , current :: Player Gomoku
     } deriving (Eq, Show)
 
@@ -44,45 +41,39 @@ boardDim = 15
 boardSize :: Size
 boardSize = Size (boardDim, boardDim)
 
+numPositions = boardDim * boardDim
+
 showBoard :: Gomoku -> String
 showBoard s = (unlines . map (intersperse ' ') . chunksOf mx . reverse) flat
     where
-        isBlack = isSet boardSize (black s)
-        isWhite = isSet boardSize (white s)
+        isBlack = testBit (black s)
+        isWhite = testBit (white s)
         flat = [ char
-               | coord <- allCoords
+               | i <- [0..numPositions-1]
                , let char
-                       | isBlack coord = 'X'
-                       | isWhite coord = 'O'
+                       | isBlack i = 'X'
+                       | isWhite i = 'O'
                        | otherwise     = '.' ]
         Size (mx, _) = boardSize
 
 printBoard :: Gomoku -> IO ()
 printBoard = putStr . showBoard
 
--- |A Coord for every intersection on the board
-allCoords :: [Coord]
-allCoords =
-    [ Coord (x,y)
-    | y <- [0..my-1]
-    , x <- [0..mx-1] ]
-    where (Size (mx, my)) = boardSize
-
 -- |A combined bitmask of all occupied positions
-occupied :: Gomoku -> Mask Integer
-occupied Gomoku { black = Mask bs, white = Mask ws }
-    = Mask (bs .|. ws)
+occupied :: Gomoku -> BitBoard Integer
+occupied Gomoku { black = bs, white = ws }
+    = bs .|. ws
 
 -- |Lists all moves that haven't been played yet
 unplaced :: Gomoku -> [Action Gomoku]
 unplaced s
-    = [ Place coord
-      | coord <- allCoords
-      , not $ isSet boardSize os coord ]
+    = [ Place i
+      | i <- [0..numPositions-1]
+      , not $ testBit os i ]
     where os = occupied s
 
-hasWin :: Mask Integer -> Bool
-hasWin m = hasNInRow boardSize m 5
+hasWin :: BitBoard Integer -> Bool
+hasWin m = hasNInRow m 5
 
 noMoves :: Gomoku -> Bool
 noMoves = null . unplaced
@@ -94,21 +85,21 @@ instance State Gomoku where
         deriving (Show, Eq)
 
     data Action Gomoku
-        = Place Coord
+        = Place Int
         deriving (Eq, Show)
 
-    start = Gomoku { black   = Mask 0
-                   , white   = Mask 0
+    start = Gomoku { black   = BitBoard (0, boardSize)
+                   , white   = BitBoard (0, boardSize)
                    , current = Black }
 
     currentTurn = current
 
     nextState s@Gomoku { current = p } (Place c)
         = case p of
-            Black -> s { black = set boardSize (black s) c , current = White }
-            White -> s { white = set boardSize (white s) c , current = Black }
+            Black -> s { black = setBit (black s) c , current = White }
+            White -> s { white = setBit (white s) c , current = Black }
 
-    legalActions [] = map Place allCoords
+    legalActions [] = map Place [0..numPositions-1]
     legalActions (s:_) = unplaced s
 
     winner [] = InProgress
