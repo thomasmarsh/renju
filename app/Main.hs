@@ -21,7 +21,7 @@ rollout g
 
 testRollout :: IO ()
 testRollout = rollout (start :: Gomoku) >>= (\x
-                -> do {printBoard x;  print $ winner [x]})
+                -> do {print x;  print $ winner [x]})
 
 main :: IO ()
 main = do

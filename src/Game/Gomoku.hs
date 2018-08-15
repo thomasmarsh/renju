@@ -9,8 +9,6 @@ module Game.Gomoku
     , nextState
     , legalActions
     , winner
-    , showBoard
-    , printBoard
     ) where
 
 import State           ( State(..)
@@ -40,23 +38,23 @@ data Gomoku
     { black   :: GomokuBoard
     , white   :: GomokuBoard
     , current :: Player Gomoku
-    } deriving (Eq, Show)
+    } deriving Eq
 
 
-showBoard :: Gomoku -> String
-showBoard s = (unlines . map (intersperse ' ') . chunksOf width . reverse) flat
-    where
-        isBlack = testBit (black s)
-        isWhite = testBit (white s)
-        flat = [ char
-               | i <- [0..numPositions-1]
-               , let char
-                       | isBlack i = 'X'
-                       | isWhite i = 'O'
-                       | otherwise = '.' ]
-
-printBoard :: Gomoku -> IO ()
-printBoard = putStr . showBoard
+instance Show Gomoku where
+    show s = ( unlines
+             . map (intersperse ' ')
+             . chunksOf width . reverse
+             ) flat
+        where
+            isBlack = testBit (black s)
+            isWhite = testBit (white s)
+            flat = [ char
+                   | i <- [0..numPositions-1]
+                   , let char
+                           | isBlack i = 'X'
+                           | isWhite i = 'O'
+                           | otherwise = '.' ]
 
 -- |A combined bitmask of all occupied positions
 occupied :: Gomoku -> GomokuBoard
