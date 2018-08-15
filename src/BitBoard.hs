@@ -26,7 +26,7 @@ import GHC.TypeLits (KnownNat, natVal')
 data Direction
     = N  | E  | S  | W
     | NE | NW | SE | SW
-    deriving (Eq, Show)
+    deriving (Eq, Show, Bounded, Enum)
 
 -- |A BitBoard is a backing type (e.g., `Word8`, `Integer`, etc.) and
 -- static KnownNat parameters w for width and h for height
@@ -166,5 +166,5 @@ hasNInRow :: (KnownNat w, KnownNat h, Bits a, Integral a)
           => BitBoard w h a -> Int -> Bool
 hasNInRow b k = any (/= 0) eroded
     where
-        dirs = [N,E,S,W,NE,NW,SE,SW]
+        dirs = [minBound..]
         eroded = map (\dir -> toInt $ applyN (erode dir) (k-1) b) dirs
