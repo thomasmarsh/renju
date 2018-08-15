@@ -1,15 +1,13 @@
+{-# LANGUAGE DataKinds #-}
 module TestShift (testShifts) where
 
 import BitBoard    ( BitBoard(..)
                    , Direction(..)
                    , shiftD
-                   , wall
-                   , toInt
                    )
-import Data.Bits   (complement, shift, (.&.))
 import Data.Digits (unDigits)
 
-{-
+type FourByFour = BitBoard 4 4 Int
 
 a,n,e,s,w,ne,nw,se,sw :: [Int]
 a = [ 1, 1, 0, 1
@@ -57,51 +55,30 @@ sw = [ 0, 0, 0, 0
      , 0, 1, 0, 0
      , 0, 1, 0, 0 ]
 
-pairs :: [(String, [Int], Size -> Int, Size -> Int)]
-pairs = [ ("N",  n,  shiftN,  wallS')
-        , ("S",  s,  shiftS,  wallN')
-        , ("E",  e,  shiftE,  wallW')
-        , ("W",  w,  shiftW,  wallE')
-        , ("NE", ne, shiftNE, wallSW')
-        , ("NW", nw, shiftNW, wallSE')
-        , ("SE", se, shiftSE, wallNW')
-        , ("SW", sw, shiftSW, wallNE')
-        ]
-
-size :: Size
-size = Size (4,4)
-
-doShift :: (Size -> Int) -> Int -> Int
-doShift f x = clip' size $ x `shift` f size
-
-dump :: String -> Int -> IO ()
-dump label value = do
-    putStrLn $ label ++ ":"
-    putStrLn (showBin' size value)
+pairs :: [(Direction, [Int])]
+pairs = [ (N, n) , (E, e)
+        , (S, s) , (W, w)
+        , (NE, ne) , (NW, nw)
+        , (SE, se) , (SW, sw) ]
 
 testShifts :: IO ()
 testShifts = do
+    let input = BitBoard $ unDigits 2 a :: FourByFour
     putStrLn "Input:"
-    putStrLn $ showBin' size (unDigits 2 a)
-    mapM_ (\(label, x, f, wallF) -> do
-
-        let shifted  = doShift f (unDigits 2 a)
-        let expected = unDigits 2 x
-        let wall     = wallF size
-        let masked   = shifted .&. complement wall
+    print input
+    mapM_ (\(dir, x) -> do
+        let expected = BitBoard $ unDigits 2 x :: FourByFour
+        let result = shiftD dir input
 
         putStrLn "--"
-        putStr $ label ++ ":"
+        putStr $ show dir ++ ":"
 
-        if masked == expected
+        if result == expected
             then putStrLn "OK"
             else do
                 putStrLn ""
-                dump "Result"   masked
-                dump "Shifted"  shifted
-                dump "Wall"     wall
-                dump "Expected" expected
+                putStrLn "Result:"
+                print result
+                putStrLn "Expected:"
+                print expected
         ) pairs
-        -}
-testShifts :: IO ()
-testShifts = print "hi"

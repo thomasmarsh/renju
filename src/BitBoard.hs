@@ -144,7 +144,7 @@ shiftD W  b = shiftD' b E  1
 shiftD NE b = shiftD' b SW (width b-1)
 shiftD NW b = shiftD' b SE (width b+1)
 shiftD SE b = shiftD' b NW (-(width b)-1)
-shiftD SW b = shiftD' b NE (-(width b)-1)
+shiftD SW b = shiftD' b NE (-(width b)+1)
 
 erode :: (KnownNat w, KnownNat h, Bits a, Num a)
       => Direction -> BitBoard w h a -> BitBoard w h a
