@@ -2,7 +2,6 @@ module TestShift (testShifts) where
 
 import BitBoard    ( BitBoard(..)
                    , Direction(..)
-                   , Size(..)
                    , shiftD
                    , wall
                    , toInt

@@ -19,8 +19,11 @@ rollout g
             rollout g'
         _ -> pure g
 
+testRollout :: IO ()
+testRollout = rollout (start :: Gomoku) >>= (\x
+                -> do {printBoard x;  print $ winner [x]})
+
 main :: IO ()
 main = do
-    rollout (start :: Gomoku) >>= (\x
-        -> do {printBoard x;  print $ winner [x]})
+    testRollout
     testShifts

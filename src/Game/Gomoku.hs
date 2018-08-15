@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DataKinds #-}
 
 module Game.Gomoku
     ( Gomoku(..)
@@ -8,7 +9,6 @@ module Game.Gomoku
     , nextState
     , legalActions
     , winner
-    , boardSize
     , showBoard
     , printBoard
     ) where
@@ -17,7 +17,6 @@ import State           ( State(..)
                        , Winner(..)
                        )
 import BitBoard        ( BitBoard(..)
-                       , Size(..)
                        , hasNInRow
                        )
 import Data.Bits       ((.|.), setBit, testBit)
@@ -27,24 +26,25 @@ import Data.List.Split (chunksOf)
 -- TODO: support more opening rules:
 -- http://gomokuworld.com/gomoku/2
 
+
+width :: Int
+width = 15
+
+numPositions :: Int
+numPositions = width * width
+
+type GomokuBoard = BitBoard 15 15 Integer
+
 data Gomoku
     = Gomoku
-    { black   :: BitBoard Integer
-    , white   :: BitBoard Integer
+    { black   :: GomokuBoard
+    , white   :: GomokuBoard
     , current :: Player Gomoku
     } deriving (Eq, Show)
 
--- |According to Gomoku rules, the board size is fixed at 15x15
-boardDim :: Int
-boardDim = 15
-
-boardSize :: Size
-boardSize = Size (boardDim, boardDim, True)
-
-numPositions = boardDim * boardDim
 
 showBoard :: Gomoku -> String
-showBoard s = (unlines . map (intersperse ' ') . chunksOf mx . reverse) flat
+showBoard s = (unlines . map (intersperse ' ') . chunksOf width . reverse) flat
     where
         isBlack = testBit (black s)
         isWhite = testBit (white s)
@@ -53,14 +53,13 @@ showBoard s = (unlines . map (intersperse ' ') . chunksOf mx . reverse) flat
                , let char
                        | isBlack i = 'X'
                        | isWhite i = 'O'
-                       | otherwise     = '.' ]
-        Size (mx, _, _) = boardSize
+                       | otherwise = '.' ]
 
 printBoard :: Gomoku -> IO ()
 printBoard = putStr . showBoard
 
 -- |A combined bitmask of all occupied positions
-occupied :: Gomoku -> BitBoard Integer
+occupied :: Gomoku -> GomokuBoard
 occupied Gomoku { black = bs, white = ws }
     = bs .|. ws
 
@@ -72,7 +71,7 @@ unplaced s
       , not $ testBit os i ]
     where os = occupied s
 
-hasWin :: BitBoard Integer -> Bool
+hasWin :: GomokuBoard -> Bool
 hasWin m = hasNInRow m 5
 
 noMoves :: Gomoku -> Bool
@@ -88,8 +87,8 @@ instance State Gomoku where
         = Place Int
         deriving (Eq, Show)
 
-    start = Gomoku { black   = BitBoard (0, boardSize)
-                   , white   = BitBoard (0, boardSize)
+    start = Gomoku { black   = BitBoard 0
+                   , white   = BitBoard 0
                    , current = Black }
 
     currentTurn = current
