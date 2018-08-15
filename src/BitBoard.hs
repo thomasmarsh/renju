@@ -9,10 +9,11 @@ module BitBoard
     )
     where
 
-import Data.Bits       (Bits(..))
+import Data.Bits       (Bits(..), FiniteBits(..))
 import Data.Char       (intToDigit)
 import Data.List       (intersperse)
 import Data.List.Split (chunksOf)
+import Data.Semigroup  (Semigroup(..))
 import Data.Tuple      (swap)
 import Numeric         (showIntAtBase)
 
@@ -21,14 +22,22 @@ data Direction
     | NE | NW | SE | SW
     deriving (Eq, Show)
 
-newtype Size = Size (Int, Int)  deriving (Eq, Show)
+newtype Size = Size (Int, Int, Bool) deriving (Eq, Show)
+
+instance Semigroup Size where
+    Size    (_,_,False) <>    Size (_,_,False) = Size (0,0,False)
+    Size    (_,_,False) <> x@(Size (_,_,True)) = x
+    x@(Size (_,_,True)) <>    Size (_,_,False) = x
+    x@(Size (_,_,True)) <> y@(Size (_,_,True))
+        | x /= y    = error $ "size mismatch: " ++ show (x, y)
+        | otherwise = x
 
 -- |A BitBoard is a backing type (e.g., `Word8`, `Integer`, etc.)
 -- where a is in the context `(Num a, Bits a)`, and has a Size component.
 newtype BitBoard a = BitBoard (a, Size) deriving Eq
 
 width :: BitBoard a -> Int
-width (BitBoard (_, Size(w, _))) = w
+width (BitBoard (_, Size(w, _, _))) = w
 
 size :: BitBoard a -> Size
 size (BitBoard (_, z)) = z
@@ -47,13 +56,16 @@ instance (Bits a, Num a) => Bits (BitBoard a) where
     rotate                             = applyS rotate
     rotateL                            = applyS rotateL
     rotateR                            = applyS rotateR
-    bitSize (BitBoard (_, Size (w,h))) = w * h
+    bitSize (BitBoard (_, Size (w,h,_))) = w * h
     bitSizeMaybe                       = Just . bitSize
     isSigned _                         = False
     testBit (BitBoard (m, _))          = testBit m
     -- TODO: this `Size (0,0)` is a major issue that needs to be fixed.
-    bit i                              = BitBoard (bit i, Size (0,0))
+    bit i                              = BitBoard (bit i, Size (0,0,False))
     popCount (BitBoard (m, _))         = popCount m
+
+instance (Bits a, Num a) => FiniteBits (BitBoard a) where
+    finiteBitSize = bitSize
 
 -- The following methods naively assume that any operation they are
 -- applying to the bits could cause overflow and that the result
@@ -69,8 +81,7 @@ applyBin
     -> BitBoard a
 applyBin f b@(BitBoard (m1, z1))
              (BitBoard (m2, z2))
-    | z1 /= z2 = error $ "size mismatch comparing " ++ show (z1, z2)
-    | otherwise = BitBoard ( maskToSize b $ f m1 m2 , z1 )
+    = BitBoard ( maskToSize b $ f m1 m2 , z1 <> z2 )
 {-# INLINE applyBin #-}
 
 applyUn :: (Bits a, Num a) => (a -> a) -> BitBoard a -> BitBoard a
@@ -86,7 +97,7 @@ maskToSize b m = m .&. (2 ^ bitSize b - 1)
 {-# INLINE maskToSize #-}
 
 instance (Bits a, Integral a, Show a) => Show (BitBoard a) where
-    show b@(BitBoard (m, Size (w,_)))
+    show b@(BitBoard (m, Size (w,_,_)))
         = unlines . map (intersperse ' ') $ rows
         where binStr  = showIntAtBase 2 intToDigit m ""
               missing = bitSize b - length binStr
@@ -96,12 +107,12 @@ instance (Bits a, Integral a, Show a) => Show (BitBoard a) where
 
 -- |A row of 1s along each wall
 wall :: (Bits a, Num a) => Direction -> Size -> BitBoard a
-wall N z@(Size (w,h)) = BitBoard ((2^w-1) `shift` (w * (h-1)), z)
-wall E z@(Size (w,h)) = BitBoard (foldl (.|.) 0
+wall N z@(Size (w,h,_)) = BitBoard ((2^w-1) `shift` (w * (h-1)), z)
+wall E z@(Size (w,h,_)) = BitBoard (foldl (.|.) 0
                                         [ 1 `shift` (w*x)
                                         | x<-[0..h-1] ], z)
-wall S z@(Size (w,_)) = BitBoard (2^w-1, z)
-wall W z@(Size (w,h)) = BitBoard (foldl (.|.) 0
+wall S z@(Size (w,_,_)) = BitBoard (2^w-1, z)
+wall W z@(Size (w,h,_)) = BitBoard (foldl (.|.) 0
                                         [ 1 `shift` (w*x+w-1)
                                         | x <- [0..h-1] ], z)
 

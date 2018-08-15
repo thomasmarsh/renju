@@ -39,7 +39,7 @@ boardDim :: Int
 boardDim = 15
 
 boardSize :: Size
-boardSize = Size (boardDim, boardDim)
+boardSize = Size (boardDim, boardDim, True)
 
 numPositions = boardDim * boardDim
 
@@ -54,7 +54,7 @@ showBoard s = (unlines . map (intersperse ' ') . chunksOf mx . reverse) flat
                        | isBlack i = 'X'
                        | isWhite i = 'O'
                        | otherwise     = '.' ]
-        Size (mx, _) = boardSize
+        Size (mx, _, _) = boardSize
 
 printBoard :: Gomoku -> IO ()
 printBoard = putStr . showBoard
