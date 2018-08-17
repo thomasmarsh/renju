@@ -27,6 +27,8 @@ instance State TTTState where
 
     nextState (TTTState s) a = TTTState (S.insert a s)
 
+    allPlayers = [X,O]
+
     legalActions [] = S.toList allActions
     legalActions (TTTState s:_) = S.toList $ allActions `S.difference` s
 

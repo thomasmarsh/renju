@@ -99,6 +99,8 @@ instance State Gomoku where
     legalActions [] = map Place [0..numPositions-1]
     legalActions (s:_) = unplaced s
 
+    allPlayers = [Black, White]
+
     winner [] = InProgress
     winner (s@Gomoku { black = bs, white = ws }:_)
         | hasWin bs = Win Black

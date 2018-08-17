@@ -1,29 +1,24 @@
 module Main where
 
-import Game.Gomoku
-import State (Winner(..))
-import System.Random (randomRIO)
+import State (State(..), Winner(..))
 import TestShift (testShifts)
+import System.Random (RandomGen, getStdGen)
+import Game.Gomoku (Gomoku(..))
+import MCTS
 
-rstep :: Gomoku -> IO Gomoku
-rstep s = do
-    let actions = legalActions [s]
-    n <- randomRIO (0::Int,length actions-1)
-    pure $ nextState s (actions !! n)
-
-rollout :: Gomoku -> IO Gomoku
-rollout g
-    = case winner [g] of
-        InProgress -> do
-            g' <- rstep g
-            rollout g'
-        _ -> pure g
-
-testRollout :: IO ()
-testRollout = rollout (start :: Gomoku) >>= (\x
-                -> do {print x;  print $ winner [x]})
+selfPlay :: (Show a, State a, RandomGen g)
+         => a -> Config a g -> Int -> g-> IO ()
+selfPlay state conf n g
+    | winner [state] == InProgress = do
+        print state
+        let (state', g') = doIterativeMcts state conf n g
+        selfPlay state' conf n g'
+    | otherwise = do
+        print state
+        pure ()
 
 main :: IO ()
 main = do
-    testRollout
     testShifts
+    g <- getStdGen
+    selfPlay (start :: Gomoku) defaultConfig 40 g

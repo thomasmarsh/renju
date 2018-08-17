@@ -26,6 +26,7 @@ dependencies:
 - ghc-prim
 - random
 - split
+- time
 
 library:
   source-dirs: src
