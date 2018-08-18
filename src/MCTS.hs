@@ -1,8 +1,4 @@
-{-# LANGUAGE DatatypeContexts    #-} -- TODO: remove
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE RankNTypes #-}
 
 module MCTS where
 
@@ -25,16 +21,15 @@ type ScoreTuple a = [(a, Score)]
 type Score        = Double
 type Plays        = Int
 
-data (State a, RandomGen g) => Config a g
-    = Config
+data Config = Config
     { expandConst :: Int
-    , select :: (State a, RandomGen g) => [(ScoreTuple (Player a), Plays)] -> Player a -> g -> (Int, g)
-    , backProp :: State a => Winner (Player a)
+    , select :: forall a g. (State a, RandomGen g) => [(ScoreTuple (Player a), Plays)] -> Player a -> g -> (Int, g)
+    , backProp :: forall a. State a => Winner (Player a)
                           -> (ScoreTuple (Player a), Plays)
                           -> (ScoreTuple (Player a), Plays)
     }
 
-defaultConfig :: (State a, RandomGen g) => Config a g
+defaultConfig :: Config
 defaultConfig
     = Config
     { expandConst = 1
@@ -98,7 +93,7 @@ readTuple :: Eq p => p -> ScoreTuple p -> Score
 readTuple _ [] = error "tried to read a list with non-element"
 readTuple p ((p',n'):ps) = if p == p' then n' else readTuple p ps
 
-mcts :: (State a, RandomGen g) => MCT a -> Config a g -> g -> (MCT a, Winner (Player a), g)
+mcts :: (State a, RandomGen g) => MCT a -> Config -> g -> (MCT a, Winner (Player a), g)
 mcts t conf g
     | s /= InProgress = (backP t s, s, g)
     | 0 == rPlayed t  = (backP t ssim, ssim, g')
@@ -135,7 +130,7 @@ mcts t conf g
 
   where n is the number of iterations to do.
 -}
-doIterativeMcts :: (State a, RandomGen g) => a -> Config a g -> Int -> g -> (a,g)
+doIterativeMcts :: (State a, RandomGen g) => a -> Config -> Int -> g -> (a,g)
 doIterativeMcts game conf n gen = (selectBestMove endTree, gen')
   where
     startTree = expand $ toLeaf game
@@ -160,7 +155,7 @@ doIterativeMcts game conf n gen = (selectBestMove endTree, gen')
   if you are under strict time constraints.
 -}
 
-doTimedMcts :: (State a, RandomGen g) => a -> Config a g -> g -> Int -> IO (a,g)
+doTimedMcts :: (State a, RandomGen g) => a -> Config -> g -> Int -> IO (a,g)
 doTimedMcts game conf gen n = do
     currentTimestamp <- getCurrentTime
     let maxTimeStamp = addUTCTime (fromIntegral n / 1000) currentTimestamp
